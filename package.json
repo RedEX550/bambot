@@ -2,7 +2,7 @@
   "name": "bambot",
   "version": "1.0.0",
   "private": true,
-  "description": "Bambot — the community platform bot for the Bambu Lab Discord, with a full web dashboard.",
+  "description": "Bambot \u2014 the community platform bot for the Bambu Lab Discord, with a full web dashboard.",
   "license": "MIT",
   "workspaces": [
     "packages/shared",
@@ -30,7 +30,9 @@
     "db:studio": "prisma studio",
     "seed": "node packages/bot/dist/scripts/seed.js",
     "typecheck": "tsc -b --pretty",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "start": "node start.js",
+    "setup": "prisma generate && prisma db push && npm run build"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

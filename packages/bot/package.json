@@ -15,6 +15,7 @@
     "@prisma/client": "^6.2.1",
     "croner": "^9.0.0",
     "dayjs": "^1.11.13",
+    "dejavu-fonts-ttf": "^2.37.3",
     "discord.js": "^14.27.0",
     "dotenv": "^16.4.7",
     "pino": "^9.5.0",

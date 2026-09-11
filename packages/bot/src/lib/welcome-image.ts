@@ -2,6 +2,7 @@ import { createCanvas, loadImage, type SKRSContext2D, type Image } from "@napi-r
 import { AttachmentBuilder } from "discord.js";
 import type { WelcomeConfig } from "@bambot/shared";
 import { childLogger } from "./../core/logger";
+import { ensureFonts, fontStack } from "./fonts";
 
 const log = childLogger("welcome-image");
 
@@ -32,10 +33,10 @@ const rgba = (hex: string, alpha: number): string => {
 /** Shrinks the font until the text fits the available width. */
 const fitText = (ctx: SKRSContext2D, text: string, maxWidth: number, startSize: number, weight = "bold"): number => {
   let size = startSize;
-  ctx.font = `${weight} ${size}px "Segoe UI", "DejaVu Sans", sans-serif`;
+  ctx.font = fontStack(weight, size);
   while (ctx.measureText(text).width > maxWidth && size > 12) {
     size -= 2;
-    ctx.font = `${weight} ${size}px "Segoe UI", "DejaVu Sans", sans-serif`;
+    ctx.font = fontStack(weight, size);
   }
   return size;
 };
@@ -117,6 +118,7 @@ const drawAvatar = (ctx: SKRSContext2D, image: Image, cx: number, cy: number, si
  * a broken banner must never block a welcome.
  */
 export const renderWelcomeBuffer = async (input: WelcomeImageInput): Promise<Buffer | null> => {
+  ensureFonts();
   try {
     const cfg = input.config;
     const canvas = createCanvas(WIDTH, HEIGHT);
@@ -186,12 +188,12 @@ export const renderWelcomeBuffer = async (input: WelcomeImageInput): Promise<Buf
 
     const titleSize = fitText(ctx, input.title, textWidth, 54);
     ctx.fillStyle = text;
-    ctx.font = `bold ${titleSize}px "Segoe UI", "DejaVu Sans", sans-serif`;
+    ctx.font = fontStack("bold", titleSize);
     ctx.fillText(input.title, textLeft, HEIGHT / 2 + 2);
 
     if (input.subtitle) {
       const subSize = fitText(ctx, input.subtitle, textWidth, 26, "normal");
-      ctx.font = `normal ${subSize}px "Segoe UI", "DejaVu Sans", sans-serif`;
+      ctx.font = fontStack("normal", subSize);
       ctx.fillStyle = rgba(text, 0.72);
       ctx.fillText(input.subtitle, textLeft, HEIGHT / 2 + 44);
     }

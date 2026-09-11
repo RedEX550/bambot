@@ -32,7 +32,7 @@ authRouter.get("/login", (req, res) => {
 
   res.cookie(STATE_COOKIE, `${state}|${returnTo}`, {
     httpOnly: true,
-    secure: env.isProduction,
+    secure: env.useSecureCookies,
     sameSite: "lax",
     maxAge: 600_000,
     path: "/",

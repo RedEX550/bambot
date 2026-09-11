@@ -2,6 +2,8 @@ import { ActivityType, Events } from "discord.js";
 import type { BotEvent } from "../core/types";
 import { childLogger } from "../core/logger";
 import { prisma } from "../core/db";
+import { env } from "../core/env";
+import { deployCommands } from "../core/deploy";
 
 const log = childLogger("ready");
 
@@ -16,6 +18,20 @@ export const ready: BotEvent<"clientReady"> = {
       { tag: user.tag, guilds: client.guilds.cache.size, commands: client.commands.size },
       "Bambot is online",
     );
+
+    if (env.AUTO_DEPLOY_COMMANDS) {
+      const result = await deployCommands(client);
+      if (result.ok) {
+        log.info(
+          { count: result.count, scope: result.scope },
+          result.scope === "global"
+            ? "slash commands registered globally — Discord can take up to an hour to show them"
+            : "slash commands registered to the dev guild",
+        );
+      } else {
+        log.error({ error: result.error }, "automatic command registration failed");
+      }
+    }
 
     user.setPresence({
       status: "online",

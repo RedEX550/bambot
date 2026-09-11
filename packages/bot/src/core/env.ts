@@ -6,6 +6,15 @@ const schema = z.object({
   DISCORD_CLIENT_ID: z.string().min(5),
   DATABASE_URL: z.string().min(1),
   DEV_GUILD_ID: z.string().optional().default(""),
+  /**
+   * Register slash commands on every boot. Panels give no shell, so this is the
+   * only practical way to deploy commands there. Cheap and idempotent: Discord
+   * treats the payload as the complete set.
+   */
+  AUTO_DEPLOY_COMMANDS: z
+    .string()
+    .default("0")
+    .transform((v) => v === "1" || v.toLowerCase() === "true"),
   BOT_INTERNAL_PORT: z.coerce.number().int().min(1).max(65535).default(4100),
   INTERNAL_API_KEY: z.string().min(8, "INTERNAL_API_KEY must be at least 8 characters"),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),

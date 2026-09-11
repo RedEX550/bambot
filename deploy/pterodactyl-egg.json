@@ -1,0 +1,253 @@
+{
+  "_comment": "Bambot \u2014 Pterodactyl egg. Import via Admin > Nests > Import Egg. Runs the Discord bot and the dashboard in one process on the server's primary allocation.",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2026-09-11T00:00:00+00:00",
+  "name": "Bambot",
+  "author": "rezzy550@gmail.com",
+  "description": "Bambot \u2014 Discord community bot and web dashboard for the Bambu Lab community. Runs the gateway client and the dashboard API in a single Node process, serving the dashboard on the server's primary port.",
+  "features": null,
+  "docker_images": {
+    "Node 22": "ghcr.io/parkervcp/yolks:nodejs_22",
+    "Node 24": "ghcr.io/parkervcp/yolks:nodejs_24"
+  },
+  "file_denylist": [],
+  "startup": "if [ \"${AUTO_MIGRATE}\" = \"1\" ]; then echo \"[bambot] syncing database schema...\"; npx --yes prisma db push --skip-generate || echo \"[bambot] db push failed - check DATABASE_URL\"; fi; node /home/container/start.js",
+  "config": {
+    "files": "{}",
+    "startup": "{\r\n    \"done\": \"Bambot API listening\"\r\n}",
+    "logs": "{}",
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\n# Bambot installer\n#\n# Clones the repository, installs dependencies, generates the Prisma client and\n# builds all four packages. The build needs roughly 2 GB of memory because of\n# the dashboard bundle; if the server has less, build locally instead and upload\n# the repo with the dist/ folders already in place (see docs/PTERODACTYL.md).\n\nset -e\n\napt-get update\napt-get install -y --no-install-recommends git ca-certificates openssl\n\nmkdir -p /mnt/server\ncd /mnt/server\n\nif [ -z \"${GIT_ADDRESS}\" ]; then\n  echo \"[bambot] GIT_ADDRESS is empty. Upload the project to /home/container yourself, then reinstall with it set.\"\n  exit 0\nfi\n\n# Normalise the repository URL and support private repos via a token.\nif [[ ${GIT_ADDRESS} != *.git ]]; then GIT_ADDRESS=\"${GIT_ADDRESS}.git\"; fi\nif [ -n \"${GIT_USERNAME}\" ] && [ -n \"${GIT_TOKEN}\" ]; then\n  GIT_ADDRESS=\"https://${GIT_USERNAME}:${GIT_TOKEN}@$(echo -e ${GIT_ADDRESS} | cut -d/ -f3-)\"\nfi\n\nif [ \"$(ls -A /mnt/server)\" ]; then\n  echo \"[bambot] directory not empty, pulling instead of cloning\"\n  if [ -d .git ]; then git pull || true; fi\nelse\n  echo \"[bambot] cloning ${BRANCH:-main}\"\n  git clone --single-branch --branch \"${BRANCH:-main}\" \"${GIT_ADDRESS}\" .\nfi\n\necho \"[bambot] installing dependencies\"\nnpm install --no-audit --no-fund --ignore-scripts\n\necho \"[bambot] generating the prisma client\"\nnpx --yes prisma generate\n\necho \"[bambot] building\"\nnpm run build\n\n# Keep ownership sane for the container user.\nchmod -R 755 /mnt/server || true\n\necho \"[bambot] install complete\"\necho \"[bambot] next: fill in DATABASE_URL and the Discord variables on the\"\necho \"[bambot]       Startup tab, then press Start. With AUTO_MIGRATE and\"\necho \"[bambot]       AUTO_DEPLOY_COMMANDS at 1, the schema and the slash\"\necho \"[bambot]       commands are set up for you on first boot.\"\n",
+      "container": "node:22-bookworm-slim",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    {
+      "name": "Git repository",
+      "description": "HTTPS URL of the Bambot repository to deploy. Leave empty to upload the files yourself.",
+      "env_variable": "GIT_ADDRESS",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Branch",
+      "description": "Branch to deploy.",
+      "env_variable": "BRANCH",
+      "default_value": "main",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max=64",
+      "field_type": "text"
+    },
+    {
+      "name": "Git username",
+      "description": "Only needed for a private repository.",
+      "env_variable": "GIT_USERNAME",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Git token",
+      "description": "Personal access token, only needed for a private repository.",
+      "env_variable": "GIT_TOKEN",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Discord bot token",
+      "description": "Developer Portal > your app > Bot > Reset Token.",
+      "env_variable": "DISCORD_TOKEN",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": true,
+      "rules": "required|string|min:20",
+      "field_type": "text"
+    },
+    {
+      "name": "Discord client ID",
+      "description": "Developer Portal > your app > General Information > Application ID.",
+      "env_variable": "DISCORD_CLIENT_ID",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|min:5",
+      "field_type": "text"
+    },
+    {
+      "name": "Discord client secret",
+      "description": "Developer Portal > your app > OAuth2 > Client Secret. Required for dashboard sign-in.",
+      "env_variable": "DISCORD_CLIENT_SECRET",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": true,
+      "rules": "required|string|min:10",
+      "field_type": "text"
+    },
+    {
+      "name": "Database URL",
+      "description": "PostgreSQL connection string, e.g. postgresql://user:pass@host:5432/bambot?schema=public",
+      "env_variable": "DATABASE_URL",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Session secret",
+      "description": "Long random string for signing dashboard sessions. Generate with: openssl rand -hex 48",
+      "env_variable": "SESSION_SECRET",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": true,
+      "rules": "required|string|min:24",
+      "field_type": "text"
+    },
+    {
+      "name": "Internal API key",
+      "description": "Shared secret between the bot and the API halves. Generate with: openssl rand -hex 32",
+      "env_variable": "INTERNAL_API_KEY",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": true,
+      "rules": "required|string|min:8",
+      "field_type": "text"
+    },
+    {
+      "name": "Public URL",
+      "description": "The URL people open the dashboard on, with no trailing slash. Must match what Discord redirects to.",
+      "env_variable": "PUBLIC_URL",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "OAuth redirect URI",
+      "description": "Must be registered in the Discord Developer Portal character-for-character. Normally PUBLIC_URL + /api/auth/callback",
+      "env_variable": "OAUTH_REDIRECT_URI",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "CORS origins",
+      "description": "Comma separated. Normally identical to PUBLIC_URL.",
+      "env_variable": "CORS_ORIGINS",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Bot owner IDs",
+      "description": "Comma separated Discord user IDs with full access to every server on the dashboard.",
+      "env_variable": "BOT_OWNER_IDS",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Dev guild ID",
+      "description": "Optional. Registers slash commands instantly in this one server instead of waiting up to an hour for global propagation.",
+      "env_variable": "DEV_GUILD_ID",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Register commands on boot",
+      "description": "1 registers all slash commands with Discord every time the bot starts. The panel gives you no shell, so leave this at 1 unless you deploy commands another way.",
+      "env_variable": "AUTO_DEPLOY_COMMANDS",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|in:0,1",
+      "field_type": "text"
+    },
+    {
+      "name": "Auto-migrate on boot",
+      "description": "1 syncs the database schema on every start. Safe and useful; set to 0 once the schema is stable.",
+      "env_variable": "AUTO_MIGRATE",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|in:0,1",
+      "field_type": "text"
+    },
+    {
+      "name": "Trust proxy hops",
+      "description": "0 when the panel port is reached directly, 1 when behind nginx, Caddy or Cloudflare.",
+      "env_variable": "TRUST_PROXY",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|between:0,5",
+      "field_type": "text"
+    },
+    {
+      "name": "Bind address",
+      "description": "Leave as 0.0.0.0 or the panel cannot route traffic to the server.",
+      "env_variable": "BIND_ADDRESS",
+      "default_value": "0.0.0.0",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Bot internal port",
+      "description": "Loopback-only port the two halves talk over inside the container. No allocation needed.",
+      "env_variable": "BOT_INTERNAL_PORT",
+      "default_value": "4100",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "Node environment",
+      "description": "Leave as production.",
+      "env_variable": "NODE_ENV",
+      "default_value": "production",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Log level",
+      "description": "trace, debug, info, warn, error or fatal.",
+      "env_variable": "LOG_LEVEL",
+      "default_value": "info",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|in:trace,debug,info,warn,error,fatal",
+      "field_type": "text"
+    }
+  ]
+}

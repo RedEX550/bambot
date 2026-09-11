@@ -32,8 +32,10 @@ export const signSession = (sessionId: string, userId: string): string =>
 export const setSessionCookie = (res: Response, token: string) => {
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: env.isProduction,
-    sameSite: env.isProduction ? "strict" : "lax",
+    secure: env.useSecureCookies,
+    // "lax" is required for the OAuth redirect back from Discord to carry the
+    // cookie; "strict" would drop it on the cross-site navigation.
+    sameSite: "lax",
     maxAge: SESSION_TTL_DAYS * 86_400_000,
     path: "/",
   });

@@ -106,10 +106,10 @@ waiting up to an hour for global propagation.
 
 ## Deploying
 
-[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) is a step-by-step VPS guide covering
-Docker Compose, HTTPS, backups, upgrades and the things that usually go wrong.
+Two supported shapes, depending on what you are hosting on.
 
-The short version:
+**A VPS you control** — [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) covers Docker
+Compose, HTTPS, backups and upgrades:
 
 ```bash
 cp .env.example .env && nano .env    # fill in, set POSTGRES_PASSWORD
@@ -117,6 +117,19 @@ docker compose up -d --build
 docker compose exec api npx prisma db push
 docker compose exec bot node packages/bot/dist/scripts/deploy-commands.js
 ```
+
+**A game panel such as Pterodactyl** — [`docs/PTERODACTYL.md`](docs/PTERODACTYL.md),
+with an importable egg at [`deploy/pterodactyl-egg.json`](deploy/pterodactyl-egg.json).
+There, everything runs as one process on one port:
+
+```bash
+npm start        # = node start.js — bot + API + dashboard together
+```
+
+`start.js` boots the gateway client and the API in a single process and serves
+the built dashboard from it, so no reverse proxy or second allocation is needed.
+Note that Bambot needs **PostgreSQL**; a panel's built-in MySQL database will not
+work without a schema migration.
 
 ---
 

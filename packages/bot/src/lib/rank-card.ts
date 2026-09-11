@@ -1,6 +1,7 @@
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { AttachmentBuilder } from "discord.js";
 import { childLogger } from "../core/logger";
+import { ensureFonts, fontStack } from "./fonts";
 
 const log = childLogger("rank-card");
 
@@ -47,6 +48,7 @@ const compact = (value: number): string => {
 
 /** Renders the /level card. Returns null on any failure; the caller falls back to an embed. */
 export const renderRankCard = async (input: RankCardInput): Promise<AttachmentBuilder | null> => {
+  ensureFonts();
   try {
     const canvas = createCanvas(WIDTH, HEIGHT);
     const ctx = canvas.getContext("2d");
@@ -99,17 +101,17 @@ export const renderRankCard = async (input: RankCardInput): Promise<AttachmentBu
     const left = 240;
 
     ctx.fillStyle = "#FFFFFF";
-    ctx.font = 'bold 38px "Segoe UI", "DejaVu Sans", sans-serif';
+    ctx.font = fontStack("bold", 38);
     const name = input.displayName.length > 20 ? `${input.displayName.slice(0, 19)}…` : input.displayName;
     ctx.fillText(name, left, 82);
 
     // Rank and level, right aligned.
     ctx.textAlign = "right";
-    ctx.font = 'bold 34px "Segoe UI", "DejaVu Sans", sans-serif';
+    ctx.font = fontStack("bold", 34);
     ctx.fillStyle = accent;
     ctx.fillText(`LEVEL ${input.level}`, WIDTH - 45, 82);
     if (input.rank) {
-      ctx.font = 'normal 24px "Segoe UI", "DejaVu Sans", sans-serif';
+      ctx.font = fontStack("normal", 24);
       ctx.fillStyle = "rgba(255,255,255,0.6)";
       ctx.fillText(`RANK #${input.rank}`, WIDTH - 45, 118);
     }
@@ -136,7 +138,7 @@ export const renderRankCard = async (input: RankCardInput): Promise<AttachmentBu
       ctx.fill();
     }
 
-    ctx.font = 'normal 20px "Segoe UI", "DejaVu Sans", sans-serif';
+    ctx.font = fontStack("normal", 20);
     ctx.fillStyle = "rgba(255,255,255,0.75)";
     ctx.fillText(
       `${compact(input.xp - input.currentLevelXp)} / ${compact(span)} XP to level ${input.level + 1}`,
