@@ -1,0 +1,625 @@
+// Bambot — database schema
+// Provider: PostgreSQL. All per-module settings live in GuildConfig as validated JSON,
+// which is what makes "every feature editable from the dashboard" tractable: the API
+// validates a module payload with a zod schema from @bambot/shared and writes one row.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Core
+// ---------------------------------------------------------------------------
+
+model Guild {
+  id        String   @id
+  name      String
+  iconHash  String?
+  ownerId   String?
+  locale    String   @default("en-US")
+  memberCap Int      @default(0)
+  active    Boolean  @default(true)
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  configs        GuildConfig[]
+  cases          Case[]
+  tickets        Ticket[]
+  levels         Level[]
+  tags           Tag[]
+  kbArticles     KbArticle[]
+  giveaways      Giveaway[]
+  suggestions    Suggestion[]
+  roleMenus      RoleMenu[]
+  autoResponders AutoResponder[]
+  scheduled      ScheduledMessage[]
+  auditLogs      DashboardAudit[]
+  stats          DailyStat[]
+  panelMessages  PanelMessage[]
+}
+
+/// One row per feature module (e.g. "welcome", "tickets", "automod").
+/// The `data` blob is validated against that module zod schema before any write.
+model GuildConfig {
+  id        String   @id @default(cuid())
+  guildId   String
+  module    String
+  data      Json
+  version   Int      @default(1)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, module])
+  @@index([guildId])
+}
+
+// ---------------------------------------------------------------------------
+// Moderation
+// ---------------------------------------------------------------------------
+
+model Case {
+  id           String    @id @default(cuid())
+  guildId      String
+  caseNumber   Int
+  type         String
+  targetId     String
+  targetTag    String
+  moderatorId  String
+  moderatorTag String
+  reason       String    @default("No reason provided")
+  evidence     String[]  @default([])
+  severity     Int       @default(1)
+  points       Int       @default(0)
+  duration     Int?
+  expiresAt    DateTime?
+  active       Boolean   @default(true)
+  pardoned     Boolean   @default(false)
+  pardonedBy   String?
+  logChannelId String?
+  logMessageId String?
+  context      Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, caseNumber])
+  @@index([guildId, targetId])
+  @@index([guildId, moderatorId])
+  @@index([guildId, createdAt])
+  @@index([active, expiresAt])
+}
+
+model AutomodHit {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  userTag   String
+  channelId String
+  rule      String
+  action    String
+  excerpt   String
+  score     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
+  @@index([guildId, userId])
+}
+
+/// Roles a member held when they left, so rejoining restores them.
+model MemberSnapshot {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  roles     String[] @default([])
+  nickname  String?
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, userId])
+  @@index([createdAt])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  guildId    String
+  userId     String
+  method     String
+  verifiedAt DateTime @default(now())
+
+  @@unique([guildId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// Tickets & modmail
+// ---------------------------------------------------------------------------
+
+model Ticket {
+  id              String    @id @default(cuid())
+  guildId         String
+  ticketNumber    Int
+  channelId       String    @unique
+  panelId         String?
+  categoryKey     String
+  openerId        String
+  openerTag       String
+  claimedById     String?
+  claimedByTag    String?
+  claimedAt       DateTime?
+  status          String    @default("OPEN")
+  priority        String    @default("NORMAL")
+  subject         String?
+  formResponses   Json?
+  participants    String[]  @default([])
+  tags            String[]  @default([])
+  messageCount    Int       @default(0)
+  firstResponseAt DateTime?
+  closedById      String?
+  closedByTag     String?
+  closeReason     String?
+  transcriptId    String?   @unique
+  rating          Int?
+  ratingComment   String?
+  createdAt       DateTime  @default(now())
+  closedAt        DateTime?
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, ticketNumber])
+  @@index([guildId, status])
+  @@index([guildId, openerId])
+  @@index([guildId, createdAt])
+}
+
+model Transcript {
+  id        String   @id @default(cuid())
+  guildId   String
+  ticketId  String?
+  channelId String
+  html      String
+  meta      Json
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+model PanelMessage {
+  id        String   @id @default(cuid())
+  guildId   String
+  panelId   String
+  channelId String
+  messageId String
+  updatedAt DateTime @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, panelId])
+}
+
+model ModmailThread {
+  id            String    @id @default(cuid())
+  guildId       String
+  userId        String
+  userTag       String
+  channelId     String    @unique
+  open          Boolean   @default(true)
+  anonymous     Boolean   @default(false)
+  lastMessageAt DateTime  @default(now())
+  closedById    String?
+  closeReason   String?
+  createdAt     DateTime  @default(now())
+  closedAt      DateTime?
+
+  @@index([guildId, userId, open])
+}
+
+// ---------------------------------------------------------------------------
+// Engagement
+// ---------------------------------------------------------------------------
+
+model Level {
+  id            String   @id @default(cuid())
+  guildId       String
+  userId        String
+  xp            Int      @default(0)
+  level         Int      @default(0)
+  messages      Int      @default(0)
+  voiceSeconds  Int      @default(0)
+  lastMessageAt DateTime @default(now())
+  cardColor     String?
+  cardBanner    String?
+  optedOut      Boolean  @default(false)
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, userId])
+  @@index([guildId, xp])
+}
+
+model StarboardEntry {
+  id              String   @id @default(cuid())
+  guildId         String
+  sourceMessageId String
+  sourceChannelId String
+  starMessageId   String?
+  authorId        String
+  count           Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@unique([guildId, sourceMessageId])
+  @@index([guildId, count])
+}
+
+model Suggestion {
+  id          String    @id @default(cuid())
+  guildId     String
+  number      Int
+  channelId   String
+  messageId   String?
+  threadId    String?
+  authorId    String
+  authorTag   String
+  content     String
+  status      String    @default("PENDING")
+  staffNote   String?
+  handledById String?
+  upvotes     Int       @default(0)
+  downvotes   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  handledAt   DateTime?
+
+  guild Guild            @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  votes SuggestionVote[]
+
+  @@unique([guildId, number])
+  @@index([guildId, status])
+}
+
+model SuggestionVote {
+  id           String @id @default(cuid())
+  suggestionId String
+  userId       String
+  value        Int
+
+  suggestion Suggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+
+  @@unique([suggestionId, userId])
+}
+
+model Giveaway {
+  id           String    @id @default(cuid())
+  guildId      String
+  channelId    String
+  messageId    String?
+  prize        String
+  description  String?
+  winnerCount  Int       @default(1)
+  hostId       String
+  imageUrl     String?
+  requirements Json?
+  endsAt       DateTime
+  ended        Boolean   @default(false)
+  winners      String[]  @default([])
+  createdAt    DateTime  @default(now())
+
+  guild   Guild           @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  entries GiveawayEntry[]
+
+  @@index([ended, endsAt])
+}
+
+model GiveawayEntry {
+  id         String   @id @default(cuid())
+  giveawayId String
+  userId     String
+  entries    Int      @default(1)
+  createdAt  DateTime @default(now())
+
+  giveaway Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+
+  @@unique([giveawayId, userId])
+}
+
+model Poll {
+  id        String    @id @default(cuid())
+  guildId   String
+  channelId String
+  messageId String    @unique
+  question  String
+  options   Json
+  multi     Boolean   @default(false)
+  anonymous Boolean   @default(true)
+  authorId  String
+  endsAt    DateTime?
+  closed    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  votes PollVote[]
+
+  @@index([closed, endsAt])
+}
+
+model PollVote {
+  id     String @id @default(cuid())
+  pollId String
+  userId String
+  choice Int
+
+  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId, choice])
+}
+
+// ---------------------------------------------------------------------------
+// Content
+// ---------------------------------------------------------------------------
+
+model Tag {
+  id        String   @id @default(cuid())
+  guildId   String
+  name      String
+  aliases   String[] @default([])
+  content   String
+  embed     Json?
+  uses      Int      @default(0)
+  createdBy String
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, name])
+  @@index([guildId, uses])
+}
+
+model KbArticle {
+  id        String   @id @default(cuid())
+  guildId   String
+  slug      String
+  title     String
+  summary   String   @default("")
+  content   String
+  category  String   @default("general")
+  keywords  String[] @default([])
+  models    String[] @default([])
+  imageUrl  String?
+  linkUrl   String?
+  published Boolean  @default(true)
+  views     Int      @default(0)
+  helpful   Int      @default(0)
+  unhelpful Int      @default(0)
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, slug])
+  @@index([guildId, category])
+}
+
+model AutoResponder {
+  id            String   @id @default(cuid())
+  guildId       String
+  name          String
+  trigger       String
+  matchType     String   @default("contains")
+  response      Json
+  channels      String[] @default([])
+  ignoredRoles  String[] @default([])
+  requiredRoles String[] @default([])
+  cooldown      Int      @default(30)
+  deleteTrigger Boolean  @default(false)
+  enabled       Boolean  @default(true)
+  uses          Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, name])
+}
+
+model RoleMenu {
+  id          String   @id @default(cuid())
+  guildId     String
+  name        String
+  channelId   String?
+  messageId   String?
+  style       String   @default("button")
+  placeholder String?
+  minSelect   Int      @default(0)
+  maxSelect   Int      @default(0)
+  embed       Json?
+  options     Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, name])
+}
+
+model StickyMessage {
+  id            String   @id @default(cuid())
+  guildId       String
+  channelId     String   @unique
+  payload       Json
+  lastMessageId String?
+  messageGap    Int      @default(5)
+  enabled       Boolean  @default(true)
+  updatedAt     DateTime @updatedAt
+}
+
+model ScheduledMessage {
+  id        String    @id @default(cuid())
+  guildId   String
+  name      String
+  channelId String
+  payload   Json
+  cron      String?
+  runAt     DateTime?
+  timezone  String    @default("UTC")
+  enabled   Boolean   @default(true)
+  lastRunAt DateTime?
+  nextRunAt DateTime?
+  createdBy String?
+  createdAt DateTime  @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, name])
+  @@index([enabled, nextRunAt])
+}
+
+model Reminder {
+  id        String   @id @default(cuid())
+  guildId   String?
+  channelId String
+  userId    String
+  content   String
+  remindAt  DateTime
+  repeat    String?
+  fired     Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([fired, remindAt])
+  @@index([userId])
+}
+
+model Highlight {
+  id      String @id @default(cuid())
+  guildId String
+  userId  String
+  word    String
+
+  @@unique([guildId, userId, word])
+  @@index([guildId])
+}
+
+model Afk {
+  id      String   @id @default(cuid())
+  guildId String
+  userId  String
+  message String   @default("AFK")
+  since   DateTime @default(now())
+
+  @@unique([guildId, userId])
+}
+
+model TempVoice {
+  id        String   @id @default(cuid())
+  guildId   String
+  channelId String   @unique
+  ownerId   String
+  name      String
+  locked    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Bambu-specific integrations
+// ---------------------------------------------------------------------------
+
+model ReleaseWatch {
+  id          String   @id @default(cuid())
+  source      String
+  externalId  String
+  title       String
+  version     String?
+  url         String
+  body        String   @default("")
+  publishedAt DateTime
+  announced   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([source, externalId])
+  @@index([announced, publishedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Analytics & audit
+// ---------------------------------------------------------------------------
+
+model DailyStat {
+  id            String   @id @default(cuid())
+  guildId       String
+  date          DateTime @db.Date
+  joins         Int      @default(0)
+  leaves        Int      @default(0)
+  messages      Int      @default(0)
+  ticketsOpened Int      @default(0)
+  ticketsClosed Int      @default(0)
+  modActions    Int      @default(0)
+  automodHits   Int      @default(0)
+  commandsUsed  Int      @default(0)
+  voiceMinutes  Int      @default(0)
+  memberCount   Int      @default(0)
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, date])
+  @@index([guildId, date])
+}
+
+model CommandUsage {
+  id         String   @id @default(cuid())
+  guildId    String?
+  userId     String
+  command    String
+  success    Boolean  @default(true)
+  durationMs Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([guildId, command])
+  @@index([createdAt])
+}
+
+model DashboardAudit {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  userTag   String
+  action    String
+  module    String?
+  summary   String   @default("")
+  before    Json?
+  after     Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, createdAt])
+}
+
+model Blacklist {
+  id        String   @id @default(cuid())
+  targetId  String   @unique
+  scope     String   @default("user")
+  reason    String   @default("")
+  addedBy   String
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id              String    @id @default(cuid())
+  userId          String
+  userTag         String
+  avatar          String?
+  accessToken     String
+  refreshToken    String
+  expiresAt       DateTime
+  guildsCache     Json?
+  guildsFetchedAt DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([userId])
+}

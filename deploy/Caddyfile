@@ -1,0 +1,19 @@
+# Optional: put this in front of docker compose for automatic HTTPS.
+#
+#   caddy run --config deploy/Caddyfile
+#
+# Replace the domain, point its DNS at the VPS, and Caddy handles the
+# certificate on its own. WEB_PORT in .env must match the port below.
+
+bambot.example.com {
+    encode gzip zstd
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    reverse_proxy localhost:8080
+}

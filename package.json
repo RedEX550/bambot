@@ -1,0 +1,44 @@
+{
+  "name": "bambot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bambot — the community platform bot for the Bambu Lab Discord, with a full web dashboard.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/shared",
+    "packages/bot",
+    "packages/api",
+    "packages/web"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "npm run build -w @bambot/shared && npm run build -w @bambot/bot && npm run build -w @bambot/api && npm run build -w @bambot/web",
+    "build:server": "npm run build -w @bambot/shared && npm run build -w @bambot/bot && npm run build -w @bambot/api",
+    "dev": "concurrently -n bot,api,web -c green,cyan,magenta \"npm:dev:bot\" \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:bot": "npm run dev -w @bambot/bot",
+    "dev:api": "npm run dev -w @bambot/api",
+    "dev:web": "npm run dev -w @bambot/web",
+    "start:bot": "node packages/bot/dist/index.js",
+    "start:api": "node packages/api/dist/index.js",
+    "deploy:commands": "node packages/bot/dist/scripts/deploy-commands.js",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "seed": "node packages/bot/dist/scripts/seed.js",
+    "typecheck": "tsc -b --pretty",
+    "postinstall": "prisma generate"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "concurrently": "^9.1.0",
+    "prisma": "^6.2.1",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.2.1"
+  }
+}

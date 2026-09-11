@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-ink-950 text-ink-100 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+  }
+
+  /* A scrollbar that does not fight the dark theme. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-ink-700;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-600;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500/70 ring-offset-2 ring-offset-ink-950;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-xl border border-ink-700/70 bg-ink-900/70 shadow-panel backdrop-blur-sm;
+  }
+
+  .field-label {
+    @apply block text-sm font-medium text-ink-100;
+  }
+
+  .field-hint {
+    @apply mt-1 text-xs leading-relaxed text-ink-400;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-sm text-ink-100
+      placeholder:text-ink-500 transition
+      focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/60
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium
+      transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-500 text-white hover:bg-brand-400 shadow-[0_2px_10px_-2px_rgba(0,174,66,0.6)];
+  }
+
+  .btn-secondary {
+    @apply btn border border-ink-700 bg-ink-800 text-ink-100 hover:border-ink-600 hover:bg-ink-700;
+  }
+
+  .btn-ghost {
+    @apply btn text-ink-300 hover:bg-ink-800 hover:text-ink-100;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600/90 text-white hover:bg-red-500;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-md border border-ink-700 bg-ink-800 px-2 py-1 text-xs text-ink-200;
+  }
+
+  /* Mimics Discord's own embed rendering closely enough to trust the preview. */
+  .discord-embed {
+    @apply relative rounded border-l-4 bg-[#2b2d31] px-4 py-3 text-[#dbdee1];
+    max-width: 520px;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}

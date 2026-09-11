@@ -1,0 +1,96 @@
+# Bambot — full stack for a single VPS.
+#
+#   docker compose up -d --build
+#
+# Services:
+#   db   — PostgreSQL 16, data kept in a named volume
+#   bot  — the Discord gateway client and its private internal API
+#   api  — the REST API the dashboard talks to
+#   web  — nginx serving the built dashboard and proxying /api to the api service
+#
+# Only `web` publishes a port. The bot's internal API is never exposed outside
+# the compose network.
+
+name: bambot
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bambot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-bambot}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bambot} -d ${POSTGRES_DB:-bambot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [bambot]
+
+  bot:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.server
+    restart: unless-stopped
+    command: ["node", "packages/bot/dist/index.js"]
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bambot}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bambot}?schema=public
+      BOT_INTERNAL_PORT: "4100"
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - bot-data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks: [bambot]
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.server
+    restart: unless-stopped
+    command: ["node", "packages/api/dist/index.js"]
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bambot}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bambot}?schema=public
+      BOT_INTERNAL_URL: http://bot:4100
+      API_PORT: "4000"
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks: [bambot]
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on: [api]
+    networks: [bambot]
+
+volumes:
+  db-data:
+  bot-data:
+
+networks:
+  bambot:
+    driver: bridge
