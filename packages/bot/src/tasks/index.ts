@@ -195,6 +195,38 @@ export const giveawayTask: BotTask = {
   },
 };
 
+/** Closes polls whose timer ran out and greys out their buttons. */
+export const pollTask: BotTask = {
+  name: "poll-closer",
+  intervalSeconds: 60,
+  async execute(client) {
+    const due = await prisma.poll.findMany({ where: { closed: false, endsAt: { lte: new Date() } }, take: 20 });
+
+    for (const poll of due) {
+      await prisma.poll.update({ where: { id: poll.id }, data: { closed: true } }).catch(() => undefined);
+
+      const channel = client.channels.cache.get(poll.channelId);
+      if (!channel?.isTextBased()) continue;
+
+      const message = await channel.messages.fetch(poll.messageId).catch(() => null);
+      if (!message?.editable) continue;
+
+      // Leave the results visible; just stop accepting votes.
+      await message
+        .edit({
+          components: message.components.map((row) => {
+            const json = row.toJSON() as { components?: { disabled?: boolean }[] };
+            json.components?.forEach((component) => {
+              component.disabled = true;
+            });
+            return json as never;
+          }),
+        })
+        .catch(() => undefined);
+    }
+  },
+};
+
 export const reminderTask: BotTask = {
   name: "reminders",
   intervalSeconds: 30,
@@ -330,6 +362,7 @@ export const pruneTask: BotTask = {
 
 export default [
   expirySweeper,
+  pollTask,
   ticketSweeper,
   slaWatcher,
   giveawayTask,
